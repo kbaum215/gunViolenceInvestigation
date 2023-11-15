@@ -1,0 +1,118 @@
+---
+title: "ADS 506 Final Project"
+output: html_document
+date: "2023-11-04"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(readr)
+library(ggplot2)
+library(corrplot)
+```
+
+```{r}
+house=read.csv("/Users/amyou/Desktop/ADS 506/ADS 506 Final Project/raw_sales.csv")
+head(house)
+```
+
+```{r}
+#check for missing data and data inspection
+sum(is.na(house))
+str(house)
+summary(house)
+```
+
+```{r}
+#converting to proper time frame
+house$datesold <- as.POSIXct(house$datesold, format = "%Y-%m-%d %H:%M:%S")
+
+property_count <- table(house$propertyType)
+```
+
+```{r}
+#time analysis
+house<- house[order(house$datesold), ]
+
+#time series plot
+house$Month <- format(house$datesold, format = "%Y-%m")
+monthly_counts <- aggregate(house$postcode, by = list(house$Month), FUN = length)
+monthly_amounts <- aggregate(house$price, by = list(house$Month), FUN = sum)
+```
+
+```{r}
+# Data Visualization
+ggplot(house, aes(x = price)) +
+  geom_histogram(binwidth = 50000, fill = "lightblue", color = "black") +
+  labs(title = "Price Distribution", x = "Price") +
+  theme_minimal()
+
+ggplot(house, aes(x = propertyType, y = price)) +
+  geom_boxplot(fill = "lightblue") +
+  labs(title = "Price Distribution by Property Type", x = "Property Type", y = "Price") +
+  theme_minimal()
+```
+```{r}
+corr <- cor(house[, c("price", "bedrooms")])
+corr
+
+corrplot(corr, method = "color", type = "upper", tl.col = "black")
+```
+```{r}
+# detecting outliers
+price_q1 <- quantile(house$price, 0.25)
+price_q3 <- quantile(house$price, 0.75)
+iqr <- price_q3 - price_q1
+lower_bound <- price_q1 - 1.5 * iqr
+upper_bound <- price_q3 + 1.5 * iqr
+outliers <- house[house$price < lower_bound | house$price > upper_bound, ]
+
+ggplot(house, aes(x = "datesold", y = price)) +
+  geom_boxplot(fill = "lightblue") +
+  geom_point(house = house[house$price < lower_bound | house$price > upper_bound, ],
+             aes(x = 1, y = price), color = "red", shape = 18) +
+  labs(title = "Boxplot of Price with Outliers", x = "", y = "Price") +
+  theme_minimal() +
+  scale_x_discrete()
+```
+```{r}
+# Property Type Analysis
+property_type_prices <- aggregate(house$price, by = list(house$propertyType), FUN = mean)
+property_type_bedrooms <- aggregate(house$bedrooms, by = list(house$propertyType), FUN = mean)
+
+print(property_type_bedrooms)
+print(property_type_prices)
+```
+```{r}
+# Bar plot for price
+ggplot(property_type_prices, aes(x = Group.1, y = x)) +
+  geom_bar(stat = "identity", fill = "lightblue") +
+  labs(title = "Average Price by Property Type", x = "Property Type", y = "Average Price") +
+  theme_minimal()
+
+# Bar plot for bedrooms
+ggplot(property_type_bedrooms, aes(x = Group.1, y = x)) +
+  geom_bar(stat = "identity", fill = "lightblue") +
+  labs(title = "Average Bedrooms by Property Type", x = "Property Type", y = "Average Bedrooms") +
+  theme_minimal()
+```
+
+```{r}
+library(forecast)
+library(zoo)
+library(fpp2)
+library(xts)
+house_ts <- xts(house$price, order.by = house$datesold)
+
+# Create a time series plot using autoplot
+library(ggfortify) 
+
+autoplot(house_ts) +
+  ggtitle("Time Series of Transactions") +
+  xlab("Date") +
+  ylab("Number of Transactions")
+```
+
