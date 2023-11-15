@@ -1,0 +1,58 @@
+---
+title: "EDA_ADS506_Project"
+author: "Kevin Baum"
+date: "`r Sys.Date()`"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(readr)
+library(tidyverse)
+data <- read_csv("Downloads/raw_sales.csv")
+head(data)
+```
+
+```{r}
+summary(data)
+```
+
+```{r}
+str(data)
+```
+
+```{r}
+sum(is.na(data))
+```
+
+
+```{r}
+ggplot(data, aes(x=data$propertyType)) + geom_bar(fill="sky blue")
+```
+
+```{r}
+ggplot(data, aes(x=factor(bedrooms))) + 
+  geom_bar(fill = "lightgreen") + 
+  scale_x_discrete(breaks = levels(factor(data$bedrooms)))
+```
+
+```{r}
+ggplot(data, aes(x = price)) +
+  geom_histogram(binwidth = diff(range(data$price)) / 30, fill = "blue", color = "black") +
+  theme_minimal() +
+  labs(title = "Distribution of House Prices", x = "Price", y = "Count")
+
+```
+
+```{r}
+ggplot(data, aes(y = price)) +
+  geom_boxplot(fill = "orange") +
+  theme_minimal() +
+  labs(title = "Boxplot of House Prices", y = "Price")
+
+```
+
+
