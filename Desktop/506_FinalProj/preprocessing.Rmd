@@ -1,0 +1,74 @@
+---
+title: "Data_Preprocessing_ADS506Proj"
+author: "Kevin Baum"
+date: "`r Sys.Date()`"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Load in the data
+```{r}
+library(readr)
+library(caret)
+library(tidyverse)
+data <- read_csv("raw_sales.csv")
+head(data)
+```
+
+Check for missing values:
+```{r}
+colSums(is.na(data))
+```
+
+
+```{r}
+library(ggplot2)
+ggplot(data, aes(x = propertyType, y = price)) + 
+  geom_boxplot()
+```
+
+Below, we filter out the outliers based on interquartile ranges using the standard principle of 1.5 times the lowest and highest quartile. We then display the number of rows with outliers to see how many there are:
+```{r}
+Q1 <- quantile(data$price, 0.25)
+Q3 <- quantile(data$price, 0.75)
+IQR <- IQR(data$price)
+outliers <- subset(data, price < (Q1 - 1.5 * IQR) | price > (Q3 + 1.5 * IQR))
+nrow(outliers)
+```
+
+Below: we show the total amount of rows:
+```{r}
+nrow(data)
+```
+
+Next, we remove outliers:
+```{r}
+clean_data <- subset(data, price >= (Q1 - 1.5 * IQR) & price <= (Q3 + 1.5 * IQR))
+nrow(clean_data)
+```
+
+Next we show the boxplots of prices after removing outliers
+```{r}
+library(ggplot2)
+ggplot(clean_data, aes(x = propertyType, y = price)) + 
+  geom_boxplot()
+```
+
+Next, we perform data splitting with an 80/20 approach
+```{r}
+# Splitting the data into training and testing sets
+set.seed(123)  # Setting seed for reproducibility
+splitIndex <- createDataPartition(clean_data$price, p = 0.8, list = FALSE)
+
+# Creating training and testing datasets
+train_data <- clean_data[splitIndex, ]
+test_data <- clean_data[-splitIndex, ]
+
+# Displaying the number of rows in training and testing
+nrow(train_data)
+nrow(test_data)
+```
+
