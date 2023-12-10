@@ -15,7 +15,7 @@ library(corrplot)
 ```
 
 ```{r}
-house=read.csv("/Users/amyou/Desktop/ADS 506/ADS 506 Final Project/raw_sales.csv")
+house=read.csv("raw_sales.csv")
 head(house)
 ```
 

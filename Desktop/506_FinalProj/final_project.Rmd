@@ -553,20 +553,7 @@ accuracy(hw_forecast, test_ts)
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-ARIMA Model Set-up
+ARIMA Model
 ```{r}
 #converting to proper time frame
 data$datesold <- as.POSIXct(data$datesold, format = "%Y-%m-%d %H:%M:%S")
@@ -660,28 +647,7 @@ cat("Correlation between Postalcode and Bedroom: ", corr_post_bed, "\n")
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-SARIMA
+SARIMA Model
 ```{r setup}
 # Transform the "datesold" column to ensure it is in date format
 data$datesold <- as.Date(data$datesold, format = "%m/%d/%Y %H:%M")
@@ -701,6 +667,7 @@ monthly_data <- data %>%
     AvgBedrooms = mean(bedrooms)
   )
 ```
+
 Group the data into quarters
 ```{r}
 # Create a new column "Quarter" to represent the quarter

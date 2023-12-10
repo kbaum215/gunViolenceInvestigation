@@ -18,9 +18,13 @@ library(lubridate)
 library(dplyr)
 library(ggplot2)
 library(forecast)
+```
+
+```{r}
 data <- read_csv("raw_sales.csv")
 head(data)
 ```
+
 
 Check for missing values:
 ```{r}
