@@ -1,0 +1,328 @@
+---
+title: "Untitled"
+output:
+  pdf_document: default
+  html_document: default
+date: "2023-11-18"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+# Load required library
+library(dplyr)
+library(readr)
+library(ggplot2)
+library(lubridate)
+library(forecast)
+
+# Load the dataset "raw_sales"
+data_sales <- read_csv("/Users/amyou/Desktop/ADS 506/ADS 506 Final Project/raw_sales.csv")
+# Transform the "datesold" column to ensure it is in date format
+data_sales$datesold <- as.Date(data_sales$datesold, format = "%m/%d/%Y %H:%M")
+
+
+# Create a new column "YearMonth" with the first day of each month
+data_sales <- data_sales %>%
+  mutate(YearMonth = floor_date(datesold, unit = "month"))
+
+# Aggregate data into monthly time index
+monthly_data <- data_sales %>%
+  group_by(YearMonth) %>%
+  summarise(
+    TotalPrice = sum(price),
+    AvgBedrooms = mean(bedrooms)
+  )
+
+# Create a new column "Quarter" to represent the quarter
+data_sales <- data_sales %>%
+  mutate(Quarter = quarter(datesold, with_year = TRUE))
+
+# Aggregate data into quarterly time index
+quarterly_data <- data_sales %>%
+  group_by(Quarter) %>%
+  summarise(
+    TotalPrice = sum(price),
+    AvgBedrooms = mean(bedrooms)
+  )
+
+# View the first few rows of the aggregated data
+head(monthly_data)
+head(quarterly_data)
+
+# Plot Monthly Total Price Trend
+ggplot(monthly_data, aes(x = YearMonth, y = TotalPrice)) +
+  geom_line() +
+  labs(
+    title = "Monthly Total Price Trend",
+    x = "Year-Month",
+    y = "Total Price"
+  ) +
+  theme_minimal()
+
+# Check for missing values in monthly_data
+sum(is.na(monthly_data$TotalPrice))
+sum(is.na(monthly_data$YearMonth))
+
+library(zoo)  # For the na.locf function
+
+monthly_data$YearMonth <- zoo::na.locf(monthly_data$YearMonth)
+
+# Plot Quarterly Total Price Trend
+ggplot(quarterly_data, aes(x = Quarter, y = TotalPrice)) +
+  geom_line() +
+  labs(
+    title = "Quarterly Total Price Trend",
+    x = "Quarter",
+    y = "Total Price"
+  ) +
+  theme_minimal()
+
+# Additional Analysis and Visualization
+
+# Example: Histogram of property types
+ggplot(data_sales, aes(x = propertyType)) +
+  geom_bar() +
+  labs(
+    title = "Distribution of Property Types",
+    x = "Property Type",
+    y = "Count"
+  ) +
+  theme_minimal()
+
+# Create a box-and-whisker plot for the "price" column
+ggplot(data_sales, aes(y = price)) +
+  geom_boxplot() +
+  labs(
+    title = "Box-and-Whisker Plot of Price",
+    y = "Price"
+  ) +
+  theme_minimal()
+
+# EDA
+
+# Highlight potential outliers
+# Calculate the lower and upper bounds for potential outliers
+q1 <- quantile(data_sales$price, 0.25)
+q3 <- quantile(data_sales$price, 0.75)
+iqr <- q3 - q1
+lower_bound <- q1 - 1.5 * iqr
+upper_bound <- q3 + 1.5 * iqr
+
+# Identify potential outliers
+outliers <- data_sales[data_sales$price < lower_bound | data_sales$price > upper_bound,]
+
+# Print the identified outliers
+cat("Identified Outliers:\n")
+print(outliers)
+
+# Load required libraries
+library(mice)
+
+# Create a missing data pattern plot
+md.pattern(data_sales)
+
+# Summary statistics for "price"
+summary_price <- summary(data_sales$price)
+mean_price <- mean(data_sales$price)
+median_price <- median(data_sales$price)
+min_price <- min(data_sales$price)
+max_price <- max(data_sales$price)
+sd_price <- sd(data_sales$price)
+
+# Summary statistics for "bedrooms"
+summary_bedrooms <- summary(data_sales$bedrooms)
+mean_bedrooms <- mean(data_sales$bedrooms)
+median_bedrooms <- median(data_sales$bedrooms)
+min_bedrooms <- min(data_sales$bedrooms)
+max_bedrooms <- max(data_sales$bedrooms)
+sd_bedrooms <- sd(data_sales$bedrooms)
+
+# Create a bar plot to show the distribution of sales by "postcode"
+postcode_counts <- table(data_sales$postcode)
+
+ggplot(data = as.data.frame(postcode_counts), aes(x = Var1, y = Freq)) +
+  geom_bar(stat = "identity") +
+  labs(
+    title = "Distribution of Sales by Postcode",
+    x = "Postcode",
+    y = "Number of Sales"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+# Create scatterplots to explore location-specific trends
+ggplot(data_sales, aes(x = postcode, y = price)) +
+  geom_point() +
+  labs(
+    title = "Price vs. Postcode",
+    x = "Postcode",
+    y = "Price"
+  ) +
+  theme_minimal()
+
+ggplot(data_sales, aes(x = postcode, y = bedrooms)) +
+  geom_point() +
+  labs(
+    title = "Bedrooms vs. Postcode",
+    x = "Postcode",
+    y = "Bedrooms"
+  ) +
+  theme_minimal()
+
+# Calculate the Pearson correlation between "price" and "bedrooms"
+correlation_price_bedrooms <- cor(data_sales$price, data_sales$bedrooms)
+
+# Print the correlation coefficient
+cat("Pearson's Correlation between Price and Bedrooms: ", correlation_price_bedrooms, "\n")
+
+# Install required library
+library(corrplot)
+
+# Select the variables for correlation plot
+selected_vars <- c("price", "bedrooms")
+
+# Calculate the correlation matrix for these variables
+correlation_matrix <- cor(data_sales[, selected_vars])
+
+# create correlation plot
+corrplot(correlation_matrix, method = "color", tl.cex = 0.8, tl.col = "black")
+
+# Decomposing a time series into its components, to include random, seasonal, trend and observed, can provide insights into the underlying patterns. Here we use a monthly frequency.
+# Create a time series object
+ts_data <- ts(data_sales$price, frequency = 12)  # Set frequency to 12 for monthly data
+
+# Decompose the time series
+decomposed_ts <- decompose(ts_data)
+
+# Plot the decomposed components
+plot(decomposed_ts)
+```
+```{r}
+colSums(is.na(data_sales))
+```
+
+
+```{r}
+library(ggplot2)
+ggplot(data_sales, aes(x = propertyType, y = price)) + 
+  geom_boxplot()
+```
+
+Below, we filter out the outliers based on interquartile ranges using the standard principle of 1.5 times the lowest and highest quartile. We then display the number of rows with outliers to see how many there are:
+```{r}
+Q1 <- quantile(data_sales$price, 0.25)
+Q3 <- quantile(data_sales$price, 0.75)
+IQR <- IQR(data_sales$price)
+outliers <- subset(data_sales, price < (Q1 - 1.5 * IQR) | price > (Q3 + 1.5 * IQR))
+nrow(outliers)
+```
+
+Below: we show the total amount of rows:
+```{r}
+nrow(data_sales)
+```
+
+Next, we remove outliers:
+```{r}
+clean_data <- subset(data_sales, price >= (Q1 - 1.5 * IQR) & price <= (Q3 + 1.5 * IQR))
+nrow(clean_data)
+```
+
+Next we show the boxplots of prices after removing outliers
+```{r}
+library(ggplot2)
+ggplot(clean_data, aes(x = propertyType, y = price)) + 
+  geom_boxplot()
+```
+
+Next, we perform data splitting with an 80/20 approach
+```{r}
+library(readr)
+library(caret)
+library(tidyverse)
+# Splitting the data into training and testing sets
+set.seed(123)  # Setting seed for reproducibility
+splitIndex <- createDataPartition(clean_data$price, p = 0.8, list = FALSE)
+
+# Creating training and testing datasets
+train_data <- clean_data[splitIndex, ]
+test_data <- clean_data[-splitIndex, ]
+
+# Displaying the number of rows in training and testing
+nrow(train_data)
+nrow(test_data)
+
+```
+```{r}
+# Create a time series object
+ts_train <- ts(train_data$price, frequency = 1)  
+
+# Fit an ARIMA model using auto.arima
+arima <- auto.arima(ts_train)
+
+# Print the model summary
+print(summary(arima))
+
+# Plot the fitted values and observed values on the training data
+plot(forecast(arima), main = "ARIMA Model Forecast (Training Data)", xlab = "Time", ylab = "Values", xlim = c(0, length(ts_train) + 1))
+lines(ts_train, col = "blue")
+
+# Forecast on the test data
+forecast_values <- forecast(arima, h = nrow(test_data))
+
+ts_test <- ts(test_data$price, frequency = 1)
+
+# Plot the forecasted values and observed values on the test data
+plot(forecast_values, main = "ARIMA Model Forecast (Test Data)", xlab = "Time", ylab = "Values", xlim = c(length(ts_train) + 1, length(ts_train) + nrow(test_data) + 1))
+lines(ts_test, col = "blue")
+```
+
+```{r}
+ts_combined <- ts(c(train_data$price, test_data$price), frequency = 1)
+
+# Retrain the ARIMA model on the combined data
+arima_model_combined <- auto.arima(ts_combined)
+
+# Print the model summary
+print(summary(arima_model_combined))
+
+# Plot the fitted values and observed values on the combined data
+plot(forecast(arima_model_combined), main = "ARIMA Model Forecast (Combined Data)", xlab = "Time", ylab = "Values", xlim = c(0, length(ts_combined) + 1))
+lines(ts_combined, col = "purple")
+
+# Forecast on the original test data
+forecast_values_combined <- forecast(arima_model_combined, h = nrow(test_data))
+
+# Plot the forecasted values and observed values on the original test data
+plot(forecast_values_combined, main = "ARIMA Model Forecast (Original Test Data)", xlab = "Time", ylab = "Values", xlim = c(length(ts_train) + 1, length(ts_train) + nrow(test_data) + 1))
+lines(ts_test, col = "purple")
+
+plot(ts_combined, type = "l", col = "purple", lwd = 2, main = "Training and Testing Data", xlab = "Time", ylab = "Values")
+
+# Add a vertical line to indicate the separation between training and testing data
+abline(v = length(ts_train) + 0.5, col = "red", lty = 2)
+
+# Add points for the testing data on the same graph
+lines(length(ts_train) + 1:length(ts_test), test_data$price, col = "yellow", lwd = 2)
+
+# Add a legend
+legend("topright", legend = c("Training Data", "Testing Data"), col = c("purple", "yellow"), lty = c(1, 1), lwd = c(2, 2))
+```
+```{r}
+# Forecast on the original test data
+forecast_combined <- forecast(arima_model_combined, h = nrow(test_data))
+
+# Extract the forecasted values
+forecast_values <- forecast_combined$mean
+
+# Calculate Mean Absolute Percentage Error (MAPE)
+mape <- mean(abs(test_data$price - forecast_values) / test_data$price) * 100
+
+# Print the MAPE
+cat("Mean Absolute Percentage Error (MAPE):", mape, "%\n")
+```
+
+
