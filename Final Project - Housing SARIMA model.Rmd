@@ -1,0 +1,220 @@
+---
+title: "Final Project - Housing"
+author: "Pierson V"
+date: "2023-11-06"
+output: word_document
+---
+
+```{r setup}
+# Load required library
+library(dplyr)
+library(readr)
+library(ggplot2)
+library(lubridate)
+```
+
+```{r setup}
+# Load the dataset "raw_sales"
+data <- read_csv("C:\\Users\\keevi\\OneDrive\\Documents\\SDU\\ADS-506\\Week 1\\Assignment 1.2\\raw_sales.csv")
+
+# Transform the "datesold" column to ensure it is in date format
+data$datesold <- as.Date(data$datesold, format = "%m/%d/%Y %H:%M")
+```
+Group the data into months
+```{r}
+# Create a new column "YearMonth" with the first day of each month
+data <- data %>%
+  mutate(YearMonth = floor_date(datesold, unit = "month"))
+
+# Aggregate data into monthly time index
+monthly_data <- data %>%
+  group_by(YearMonth) %>%
+  summarise(
+    TotalPrice = sum(price),
+    AvgBedrooms = mean(bedrooms)
+  )
+```
+Group the data into quarters
+```{r}
+# Create a new column "Quarter" to represent the quarter
+data <- data %>%
+  mutate(Quarter = quarter(datesold, with_year = TRUE))
+
+# Aggregate data into quarterly time index
+quarterly_data <- data %>%
+  group_by(Quarter) %>%
+  summarise(
+    TotalPrice = sum(price),
+    AvgBedrooms = mean(bedrooms)
+  )
+```
+
+```{r}
+# View the first few rows of the aggregated data
+head(monthly_data)
+head(quarterly_data)
+```
+```{r}
+# Plot Monthly Total Price Trend
+ggplot(monthly_data, aes(x = YearMonth, y = TotalPrice)) +
+  geom_line() +
+  labs(
+    title = "Monthly Total Price Trend",
+    x = "Year-Month",
+    y = "Total Price"
+  ) +
+  theme_minimal()
+
+```
+```{r}
+# Check for missing values in monthly_data
+sum(is.na(monthly_data$TotalPrice))
+sum(is.na(monthly_data$YearMonth))
+```
+```{r}
+library(zoo)  # For the na.locf function
+
+monthly_data$YearMonth <- zoo::na.locf(monthly_data$YearMonth)
+
+# Plot Quarterly Total Price Trend
+ggplot(quarterly_data, aes(x = Quarter, y = TotalPrice)) +
+  geom_line() +
+  labs(
+    title = "Quarterly Total Price Trend",
+    x = "Quarter",
+    y = "Total Price"
+  ) +
+  theme_minimal()
+
+```
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Load in the data
+```{r}
+library(readr)
+library(caret)
+library(tidyverse)
+```
+
+Check for missing values:
+```{r}
+colSums(is.na(data))
+```
+
+
+```{r}
+library(ggplot2)
+ggplot(data, aes(x = propertyType, y = price)) + 
+  geom_boxplot()
+```
+
+Below, we filter out the outliers based on interquartile ranges using the standard principle of 1.5 times the lowest and highest quartile. We then display the number of rows with outliers to see how many there are:
+```{r}
+Q1 <- quantile(data$price, 0.25)
+Q3 <- quantile(data$price, 0.75)
+IQR <- IQR(data$price)
+outliers <- subset(data, price < (Q1 - 1.5 * IQR) | price > (Q3 + 1.5 * IQR))
+nrow(outliers)
+```
+
+Below: we show the total amount of rows:
+```{r}
+nrow(data)
+```
+
+Next, we remove outliers:
+```{r}
+clean_data <- subset(data, price >= (Q1 - 1.5 * IQR) & price <= (Q3 + 1.5 * IQR))
+nrow(clean_data)
+```
+
+Next we show the boxplots of prices after removing outliers
+```{r}
+library(ggplot2)
+ggplot(clean_data, aes(x = propertyType, y = price)) + 
+  geom_boxplot()
+```
+
+Next, we perform data splitting with an 80/20 approach
+```{r}
+# Splitting the data into training and testing sets
+set.seed(123)  # Setting seed for reproducibility
+splitIndex <- createDataPartition(clean_data$price, p = 0.8, list = FALSE)
+# Creating training and testing datasets
+train_data <- clean_data[splitIndex, ]
+test_data <- clean_data[-splitIndex, ]
+# Displaying the number of rows in training and testing
+nrow(train_data)
+nrow(test_data)
+```
+
+CREATING MODEL: Seasonal Autoregressive Integrated Moving Average (SAMIMA) model
+
+```{r}
+library(forecast)
+```
+
+Convert train_data to Time Series: Ensure your data is in a time series format.
+
+```{r}
+ts_data <- ts(train_data$price, frequency = 12) # Monthly data with a frequency of 12
+```
+
+Fit SARIMA Model using the auto.arima() function
+
+```{r}
+sarima_model <- auto.arima(ts_data)
+```
+
+Model Summary to see the chosen parameters and diagnostic information
+
+```{r}
+summary(sarima_model)
+```
+Forecasting to generate future forecasts using SARIMA model
+
+```{r}
+forecasted_values <- forecast(sarima_model, h = 12) #forecasting 12 steps ahead
+```
+
+Plotting the forecast to visualize the forecasted values and confidence intervals using the plot() funcation
+
+```{r}
+plot(forecasted_values)
+```
+The SARIMA model's performance using the train_data seems reasonable, however the RMSE being high suggests that the model might not be providing accurate predictions. Therefore testing using the test_data would be wise.
+
+Convert test_data to Time Series: Ensure your data is in a time series format.
+
+```{r}
+ts_data <- ts(test_data$price, frequency = 12) # Monthly data with a frequency of 12
+```
+
+Fit SARIMA Model using the auto.arima() function
+
+```{r}
+sarima_model <- auto.arima(ts_data)
+```
+
+Model Summary to see the chosen parameters and diagnostic information
+
+```{r}
+summary(sarima_model)
+```
+
+Forecasting to generate future forecasts using SARIMA model
+
+```{r}
+forecasted_values <- forecast(sarima_model, h = 12) #forecasting 12 steps ahead
+```
+
+Plotting the forecast to visualize the forecasted values and confidence intervals using the plot() funcation
+
+```{r}
+plot(forecasted_values)
+```
+
+Running the data for the test_data, shows the same issue with the RMSE being high at 157320.2. The RMSE being high shows that the accuracy of the predictions is not trustworthy.
